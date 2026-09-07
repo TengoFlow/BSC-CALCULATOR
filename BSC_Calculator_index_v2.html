@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BSC Calculator</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f5f8;color:#172033;font-family:Arial,sans-serif}
+.app{max-width:1000px;margin:auto;padding:25px 14px}
+.brand{font-size:30px;font-weight:800;margin-bottom:20px}
+.brand span{color:#155eef}
+.card{background:#fff;border:1px solid #e1e5eb;border-radius:16px;padding:18px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px}
+button{border:0;border-radius:9px;padding:11px 15px;font-weight:bold;cursor:pointer}
+.add{background:#155eef;color:#fff}
+.reset{background:#eef1f5;color:#344054}
+.tablewrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:620px}
+th{font-size:12px;color:#667085;text-align:left;padding:9px;border-bottom:2px solid #e5e7eb}
+td{padding:8px;border-bottom:1px solid #edf0f3}
+input{width:100%;height:42px;border:1px solid #d0d5dd;border-radius:8px;padding:8px 10px;font-size:16px}
+.total{font-weight:bold;white-space:nowrap}
+.del{background:#feeceb;color:#b42318;padding:9px 12px}
+.summary{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:10px;margin-top:16px}
+.metric{background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:14px}
+.metric small{display:block;color:#667085}
+.metric b{font-size:23px;display:block;margin-top:5px}
+.grand,.final{background:#eef4ff;border-color:#c9d9ff}
+.grand b,.final b{color:#155eef}
+.extra{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.extra .metric input{margin-top:7px;font-weight:bold}
+@media(max-width:650px){
+.summary{grid-template-columns:1fr 1fr}
+.grand{grid-column:1/-1}
+.extra{grid-template-columns:1fr}
+.toolbar{align-items:stretch;flex-direction:column}
+.toolbar div{display:flex;gap:8px}
+.toolbar button{flex:1}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="brand">BSC <span>Calculator</span></div>
+<div class="card">
+<div class="toolbar">
+<strong>Agents</strong>
+<div>
+<button class="reset" id="reset">Réinitialiser</button>
+<button class="add" id="add">+ Ajouter un agent</button>
+</div>
+</div>
+<div class="tablewrap">
+<table>
+<thead><tr><th>Agent</th><th>Heures</th><th>Tarif / heure</th><th>Total</th><th></th></tr></thead>
+<tbody id="body"></tbody>
+</table>
+</div>
+<div class="summary">
+<div class="metric"><small>Nombre d'agents</small><b id="count">0</b></div>
+<div class="metric"><small>Total des heures</small><b id="hours">0 h</b></div>
+<div class="metric grand"><small>TOTAL BRUT</small><b id="total">0,00 €</b></div>
+</div>
+<div class="extra">
+<div class="metric">
+<small>Pourcentage supplémentaire</small>
+<input id="percentage" type="number" min="0" step="0.01" placeholder="Ex. 30">
+</div>
+<div class="metric final">
+<small>TOTAL APRÈS POURCENTAGE</small>
+<b id="finalTotal">0,00 €</b>
+</div>
+</div>
+</div>
+</div>
+<script>
+const body=document.getElementById('body');
+const percentageInput=document.getElementById('percentage');
+const money=n=>new Intl.NumberFormat('fr-BE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)+' €';
+
+function calc(){
+ let htot=0,gtot=0;
+ [...body.rows].forEach(r=>{
+  const h=parseFloat(r.querySelector('.h').value)||0;
+  const rate=parseFloat(r.querySelector('.r').value)||0;
+  const t=h*rate;
+  htot+=h;gtot+=t;
+  r.querySelector('.t').textContent=money(t);
+ });
+ const percentage=parseFloat(percentageInput.value)||0;
+ const finalTotal=gtot*(1+percentage/100);
+ document.getElementById('count').textContent=body.rows.length;
+ document.getElementById('hours').textContent=new Intl.NumberFormat('fr-BE',{maximumFractionDigits:2}).format(htot)+' h';
+ document.getElementById('total').textContent=money(gtot);
+ document.getElementById('finalTotal').textContent=money(finalTotal);
+ localStorage.setItem('bsc-data',JSON.stringify([...body.rows].map(r=>({name:r.querySelector('.n').value,h:r.querySelector('.h').value,rate:r.querySelector('.r').value}))));
+ localStorage.setItem('bsc-percentage',percentageInput.value);
+}
+
+function add(data={}){
+ const r=body.insertRow();
+ r.innerHTML=`<td><input class="n" placeholder="Nom"></td><td><input class="h" type="number" min="0" step="0.25" placeholder="0"></td><td><input class="r" type="number" min="0" step="0.01" placeholder="0,00"></td><td class="t total">0,00 €</td><td><button class="del" type="button">×</button></td>`;
+ r.querySelector('.n').value=data.name||'';
+ r.querySelector('.h').value=data.h||'';
+ r.querySelector('.r').value=data.rate||'';
+ r.querySelectorAll('input').forEach(x=>x.addEventListener('input',calc));
+ r.querySelector('.del').onclick=()=>{r.remove();calc()};
+ calc();
+}
+
+document.getElementById('add').onclick=()=>{
+ add();
+ body.rows[body.rows.length-1].querySelector('.n').focus();
+};
+
+document.getElementById('reset').onclick=()=>{
+ if(confirm('Réinitialiser le calculateur ?')){
+  body.innerHTML='';
+  percentageInput.value='';
+  localStorage.removeItem('bsc-data');
+  localStorage.removeItem('bsc-percentage');
+  calc();
+ }
+};
+
+percentageInput.addEventListener('input',calc);
+
+let saved=[];
+try{saved=JSON.parse(localStorage.getItem('bsc-data')||'[]')}catch(e){saved=[]}
+if(saved.length)saved.forEach(add);
+percentageInput.value=localStorage.getItem('bsc-percentage')||'';
+calc();
+</script>
+</body>
+</html>
